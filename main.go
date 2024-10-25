@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/lingfliu/ucs_core/dao"
+	"github.com/lingfliu/ucs_core/data/rtdb"
 	"github.com/lingfliu/ucs_core/dd"
 	"github.com/lingfliu/ucs_core/model"
 	"github.com/lingfliu/ucs_core/model/meta"
@@ -62,7 +63,7 @@ func main() {
 	mqttCli.Start()
 
 	//intialize DAO
-	dpDao := dao.NewDpDao(utils.IpPortJoin(taosCfg.Host, taosCfg.Port), taosCfg.DbName, taosCfg.Username, taosCfg.Password)
+	dpDao := rtdb.NewTaosCli(utils.IpPortJoin(taosCfg.Host, taosCfg.Port), taosCfg.DbName, taosCfg.Username, taosCfg.Password)
 	go _task_dao_init(dpDao)
 
 	sigRun, cancelRun := context.WithCancel(context.Background())

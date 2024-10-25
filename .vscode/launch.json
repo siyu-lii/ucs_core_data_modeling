@@ -4,6 +4,8 @@
     // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
     "version": "0.2.0",
     "configurations": [
+
+        
         {
             "name": "Launch cli",
             "type": "go",
@@ -25,6 +27,7 @@
         "request": "launch",
         "mode": "debug",
         "program": "${file}",
+        //"buildFlags": "-gcflags=all=-N -l",
         "env": {
                 "LD_LIBRARY_PATH": "${workspaceFolder}/data/rtdb/lib_agilor"
             }

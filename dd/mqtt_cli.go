@@ -128,6 +128,13 @@ func (cli *MqttCli) Publish(topic string, data []byte) {
 
 	if token := cli.mc.Publish(topic, cli.Qos, false, data); token.WaitTimeout(time.Duration(cli.Timeout*int(time.Millisecond))) && token.Error() != nil {
 		cli.Disconnect()
+		ulog.Log().E("mqtt", "Failed to publish message to topic "+topic+": "+token.Error().Error())
+	} else {
+		cli.RxMsg <- &DdZeroMsg{
+			Topic: topic,
+			Data:  data,
+		}
+		ulog.Log().I("mqtt", "Published message to topic "+topic)
 	}
 }
 

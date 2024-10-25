@@ -3,11 +3,14 @@ package main
 import (
 	"encoding/binary"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"time"
 
 	"github.com/lingfliu/ucs_core/dao"
+	"github.com/lingfliu/ucs_core/data/rtdb"
 	"github.com/lingfliu/ucs_core/model"
 	"github.com/lingfliu/ucs_core/model/meta"
 	"github.com/lingfliu/ucs_core/model/msg"
@@ -24,10 +27,14 @@ const (
 
 func main() {
 	ulog.Config(ulog.LOG_LEVEL_DEBUG, "", false)
-
+	log.Println("Creating DpDao instance...")
 	//config taos
-	dpDao := dao.NewDpDao(TAOS_HOST, TAOS_DATABASE, TAOS_USERNAME, TAOS_PASSWORD)
+	dpDao := rtdb.NewTaosCli(TAOS_HOST, TAOS_DATABASE, TAOS_USERNAME, TAOS_PASSWORD)
+	log.Println("Opening database connection...")
+	// // 打开数据库连接
 	go _task_dao_init(dpDao)
+	log.Println("Successfully connected to Taos database!")
+	defer dpDao.TaosCli.Close() // 确保在退出时关闭连接
 
 	s := make(chan os.Signal, 1)
 	signal.Notify(s, os.Interrupt)
@@ -51,7 +58,12 @@ func _task_dao_query(dao *dao.DpDao) {
 	})
 	for _, pt := range ptList {
 		//serialize pt
-		ulog.Log().I("main", string(pt.Data))
+		data := pt.Data
+		for i := 0; i < len(data); i += 4 {
+			val := binary.BigEndian.Uint32(data[i : i+4])
+			ulog.Log().I("main", fmt.Sprintf("Queried value: %d", val))
+			//ulog.Log().I("main", string(pt.Data))
+		}
 	}
 }
 
@@ -80,19 +92,34 @@ func _task_insert(dao *dao.DpDao) {
 
 	dao.Insert(dmsg)
 
-	sql := fmt.Sprintf("insert into dp_0_0 using dp tags(0,0,0) values(?, 1,2,3,4)")
+	sql := "insert into dp_0_0 using dp tags(0,0,0) values(?, 1,2,3,4)"
 	dao.TaosCli.Exec(sql, dmsg.Ts)
+	ulog.Log().I("main", fmt.Sprintf("Inserted data: %v", dmsg.DataSet[0].Data))
 }
 
 func _task_dao_init(dao *dao.DpDao) {
 	dao.Open()
-	dao.Init(&model.DPoint{
+	dao.InitTable(&model.DPoint{
 		DataMeta: &meta.DataMeta{
 			DataClass: meta.DATA_CLASS_INT,
 			Dimen:     4,
 		},
 	})
 
-	go _task_dao_query(dao)
 	// go _task_insert(dao)
+	// go _task_dao_query(dao)
+	var wg sync.WaitGroup
+	wg.Add(2) // 增加 2 个 goroutine
+
+	go func() {
+		defer wg.Done()
+		_task_insert(dao)
+	}()
+
+	go func() {
+		defer wg.Done()
+		_task_dao_query(dao)
+	}()
+
+	wg.Wait() // 等待所有 goroutine 完成
 }
